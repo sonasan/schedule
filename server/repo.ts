@@ -3,6 +3,7 @@
 // expect, so the rest of the server is storage-agnostic.
 
 import { store, save, nextId } from './db.ts';
+import { ALL_DAYS } from '../shared/types.ts';
 import type {
   Affinity,
   Assignment,
@@ -100,6 +101,7 @@ export function createStation(data: Partial<Station> & { name: string }): Statio
     order: data.order ?? maxOrder + 1,
     allowsSplit: data.allowsSplit === false ? false : true,
     requiredDaily: data.requiredDaily ?? false,
+    days: data.days ?? [...ALL_DAYS],
   };
   store.stations.push(station);
   save();
@@ -114,6 +116,7 @@ export function updateStation(id: number, data: Partial<Station>): Station | und
     order: data.order ?? s.order,
     allowsSplit: data.allowsSplit ?? s.allowsSplit,
     requiredDaily: data.requiredDaily ?? s.requiredDaily,
+    days: data.days ?? s.days,
   });
   save();
   return clone(s);

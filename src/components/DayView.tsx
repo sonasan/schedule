@@ -108,7 +108,9 @@ export function DayView() {
           </button>
         </div>
         <ul className="divide-y divide-slate-100">
-          {stations.map((station) => {
+          {stations
+            .filter((station) => station.days.includes(day))
+            .map((station) => {
             const a = assignFor(station.id);
             const ids = a?.employeeIds ?? [];
             const suggestedIds = suggestions.get(station.id);

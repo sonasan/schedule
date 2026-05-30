@@ -6,7 +6,12 @@
 import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { DEFAULT_STATIONS, type Settings } from '../shared/types.ts';
+import {
+  ALL_DAYS,
+  DEFAULT_DAY_HOURS,
+  DEFAULT_STATIONS,
+  type Settings,
+} from '../shared/types.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const DB_PATH = join(__dirname, '..', 'schedule.json');
@@ -26,7 +31,12 @@ export interface StoreShape {
 function emptyStore(): StoreShape {
   return {
     meta: { employee: 0, station: 0, week: 0, shift: 0, assignment: 0 },
-    settings: { openMinutes: 240, closeMinutes: 1380, weekStartDay: 0 },
+    settings: {
+      openMinutes: 240,
+      closeMinutes: 1200,
+      weekStartDay: 0,
+      dayHours: DEFAULT_DAY_HOURS.map((h) => ({ ...h })),
+    },
     employees: [],
     stations: [],
     weeks: [],
@@ -82,9 +92,19 @@ export function initStore(): void {
         order: s.order,
         allowsSplit: s.allowsSplit,
         requiredDaily: s.requiredDaily,
+        days: [...s.days],
       });
     }
   }
+
+  // Backfill fields added in later versions so existing files keep working.
+  if (!Array.isArray(store.settings.dayHours) || store.settings.dayHours.length !== 7) {
+    store.settings.dayHours = DEFAULT_DAY_HOURS.map((h) => ({ ...h }));
+  }
+  for (const st of store.stations) {
+    if (!Array.isArray(st.days)) st.days = [...ALL_DAYS];
+  }
+
   flush();
 }
 

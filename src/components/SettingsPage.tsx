@@ -2,13 +2,19 @@ import { useState } from 'react';
 import { useSchedule } from '../store.tsx';
 import { api } from '../api.ts';
 import { minutesTo24h, time24hToMinutes } from '../../shared/time.ts';
-import { DAY_LABELS, type ImportReport } from '../../shared/types.ts';
+import {
+  DAY_LABELS,
+  DEFAULT_DAY_HOURS,
+  type DayHours,
+  type ImportReport,
+} from '../../shared/types.ts';
 import { ImportReview } from './ImportReview.tsx';
 
 export function SettingsPage() {
   const { settings, reloadStatic, weeks, currentWeekId, selectWeek } = useSchedule();
-  const [open, setOpen] = useState(minutesTo24h(settings?.openMinutes ?? 240));
-  const [close, setClose] = useState(minutesTo24h(settings?.closeMinutes ?? 1380));
+  const [dayHours, setDayHours] = useState<DayHours[]>(
+    settings?.dayHours ?? DEFAULT_DAY_HOURS,
+  );
   const [weekStart, setWeekStart] = useState(settings?.weekStartDay ?? 0);
   const [savedMsg, setSavedMsg] = useState('');
   const [csv, setCsv] = useState('');
@@ -16,11 +22,20 @@ export function SettingsPage() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
 
+  function setHour(day: number, which: 'open' | 'close', value: string) {
+    const mins = time24hToMinutes(value);
+    if (mins == null) return;
+    setDayHours((prev) => prev.map((h, i) => (i === day ? { ...h, [which]: mins } : h)));
+  }
+
   async function saveSettings() {
-    const o = time24hToMinutes(open);
-    const c = time24hToMinutes(close);
-    if (o == null || c == null) return;
-    await api.updateSettings({ openMinutes: o, closeMinutes: c, weekStartDay: weekStart });
+    // Weekday hours (Monday) double as the default used by the CSV importer.
+    await api.updateSettings({
+      openMinutes: dayHours[1].open,
+      closeMinutes: dayHours[1].close,
+      weekStartDay: weekStart,
+      dayHours,
+    });
     await reloadStatic();
     setSavedMsg('Saved');
     setTimeout(() => setSavedMsg(''), 1500);
@@ -57,30 +72,40 @@ export function SettingsPage() {
 
       {/* Store hours */}
       <div className="card space-y-4 p-4">
-        <h3 className="text-sm font-semibold text-slate-700">Store hours &amp; week</h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Opening time</label>
-            <input type="time" className="input" value={open} onChange={(e) => setOpen(e.target.value)} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Closing time</label>
-            <input type="time" className="input" value={close} onChange={(e) => setClose(e.target.value)} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Week starts on</label>
-            <select
-              className="input"
-              value={weekStart}
-              onChange={(e) => setWeekStart(Number(e.target.value))}
-            >
-              {DAY_LABELS.map((d, i) => (
-                <option key={i} value={i}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </div>
+        <h3 className="text-sm font-semibold text-slate-700">Store hours (per day)</h3>
+        <div className="space-y-1.5">
+          {DAY_LABELS.map((d, i) => (
+            <div key={i} className="grid grid-cols-[3rem_1fr_auto_1fr] items-center gap-2">
+              <span className="text-sm font-medium text-slate-600">{d}</span>
+              <input
+                type="time"
+                className="input"
+                value={minutesTo24h(dayHours[i]?.open ?? 240)}
+                onChange={(e) => setHour(i, 'open', e.target.value)}
+              />
+              <span className="text-center text-xs text-slate-400">to</span>
+              <input
+                type="time"
+                className="input"
+                value={minutesTo24h(dayHours[i]?.close ?? 1200)}
+                onChange={(e) => setHour(i, 'close', e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-500">Week starts on</label>
+          <select
+            className="input sm:max-w-[12rem]"
+            value={weekStart}
+            onChange={(e) => setWeekStart(Number(e.target.value))}
+          >
+            {DAY_LABELS.map((d, i) => (
+              <option key={i} value={i}>
+                {d}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="flex items-center gap-3">
           <button className="btn-primary" onClick={saveSettings}>

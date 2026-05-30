@@ -76,9 +76,10 @@ export function computeCoverage(input: CoverageInput): CoverageIssue[] {
       }
     }
 
-    // Uncovered required stations.
+    // Uncovered required stations (only those active on this day).
     for (const st of stations) {
       if (!st.requiredDaily) continue;
+      if (!st.days.includes(day)) continue;
       const a = dayAssignments.find((x) => x.stationId === st.id);
       if (!a || a.employeeIds.length === 0) {
         issues.push({

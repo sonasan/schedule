@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSchedule } from '../store.tsx';
 import { api } from '../api.ts';
-import type { Station } from '../../shared/types.ts';
+import { DAY_LABELS, type Station } from '../../shared/types.ts';
 
 export function StationsPage() {
   const { stations, reloadStatic } = useSchedule();
@@ -11,6 +11,13 @@ export function StationsPage() {
   async function update(id: number, patch: Partial<Station>) {
     await api.updateStation(id, patch);
     await reloadStatic();
+  }
+
+  async function toggleDay(station: Station, day: number) {
+    const days = station.days.includes(day)
+      ? station.days.filter((d) => d !== day)
+      : [...station.days, day].sort((a, b) => a - b);
+    await update(station.id, { days });
   }
 
   async function move(station: Station, dir: -1 | 1) {
@@ -56,42 +63,62 @@ export function StationsPage() {
         </div>
         <ul className="divide-y divide-slate-100">
           {sorted.map((s, i) => (
-            <li key={s.id} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 sm:grid-cols-[1fr_auto_auto_auto]">
-              <input
-                className="input"
-                value={s.name}
-                onChange={(e) => update(s.id, { name: e.target.value })}
-              />
-              <label className="flex items-center gap-1.5 text-xs text-slate-500">
+            <li key={s.id} className="space-y-2 px-4 py-2.5">
+              <div className="grid grid-cols-[1fr_auto] items-center gap-3 sm:grid-cols-[1fr_auto_auto_auto]">
                 <input
-                  type="checkbox"
-                  checked={s.allowsSplit}
-                  onChange={(e) => update(s.id, { allowsSplit: e.target.checked })}
+                  className="input"
+                  value={s.name}
+                  onChange={(e) => update(s.id, { name: e.target.value })}
                 />
-                <span className="sm:hidden">Split</span>
-              </label>
-              <label className="flex items-center gap-1.5 text-xs text-slate-500">
-                <input
-                  type="checkbox"
-                  checked={s.requiredDaily}
-                  onChange={(e) => update(s.id, { requiredDaily: e.target.checked })}
-                />
-                <span className="sm:hidden">Required</span>
-              </label>
+                <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <input
+                    type="checkbox"
+                    checked={s.allowsSplit}
+                    onChange={(e) => update(s.id, { allowsSplit: e.target.checked })}
+                  />
+                  Split
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <input
+                    type="checkbox"
+                    checked={s.requiredDaily}
+                    onChange={(e) => update(s.id, { requiredDaily: e.target.checked })}
+                  />
+                  Required
+                </label>
+                <div className="flex items-center gap-1">
+                  <button className="btn-ghost px-1.5" disabled={i === 0} onClick={() => move(s, -1)}>
+                    ↑
+                  </button>
+                  <button
+                    className="btn-ghost px-1.5"
+                    disabled={i === sorted.length - 1}
+                    onClick={() => move(s, 1)}
+                  >
+                    ↓
+                  </button>
+                  <button className="btn-ghost px-1.5 text-red-500" onClick={() => remove(s.id)}>
+                    ✕
+                  </button>
+                </div>
+              </div>
               <div className="flex items-center gap-1">
-                <button className="btn-ghost px-1.5" disabled={i === 0} onClick={() => move(s, -1)}>
-                  ↑
-                </button>
-                <button
-                  className="btn-ghost px-1.5"
-                  disabled={i === sorted.length - 1}
-                  onClick={() => move(s, 1)}
-                >
-                  ↓
-                </button>
-                <button className="btn-ghost px-1.5 text-red-500" onClick={() => remove(s.id)}>
-                  ✕
-                </button>
+                <span className="mr-1 text-[10px] uppercase tracking-wide text-slate-400">Days</span>
+                {DAY_LABELS.map((d, day) => {
+                  const on = s.days.includes(day);
+                  return (
+                    <button
+                      key={day}
+                      onClick={() => toggleDay(s, day)}
+                      title={d}
+                      className={`h-6 w-6 rounded text-[11px] font-medium transition ${
+                        on ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'
+                      }`}
+                    >
+                      {d[0]}
+                    </button>
+                  );
+                })}
               </div>
             </li>
           ))}

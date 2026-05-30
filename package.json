@@ -11,6 +11,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "start": "tsx server/index.ts",
+    "reset": "node -e \"require('fs').rmSync('schedule.json',{force:true});console.log('Data reset — restart to re-seed.')\"",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {

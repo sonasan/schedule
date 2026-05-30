@@ -71,11 +71,13 @@ export function suggestAssignments(input: SuggestInput): SuggestionProposal[] {
   const loadByEmp = new Map<number, number>();
   for (const m of pool) loadByEmp.set(m.emp.id, 0);
 
-  // Process required-daily stations first, then by display order.
-  const ordered = [...stations].sort((a, b) => {
-    if (a.requiredDaily !== b.requiredDaily) return a.requiredDaily ? -1 : 1;
-    return a.order - b.order;
-  });
+  // Only stations active on this day; required-daily first, then display order.
+  const ordered = [...stations]
+    .filter((s) => s.days.includes(input.dayIndex))
+    .sort((a, b) => {
+      if (a.requiredDaily !== b.requiredDaily) return a.requiredDaily ? -1 : 1;
+      return a.order - b.order;
+    });
 
   const proposals: SuggestionProposal[] = [];
 

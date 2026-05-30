@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Sheet } from './Sheet.tsx';
 import { useSchedule } from '../store.tsx';
-import type { Employee, Shift, ShiftState } from '../../shared/types.ts';
-import { minutesTo24h, time24hToMinutes } from '../../shared/time.ts';
+import { hoursForDay, type Employee, type Shift, type ShiftState } from '../../shared/types.ts';
+import { minutesTo24h, minutesToLabel, time24hToMinutes } from '../../shared/time.ts';
 import { STATE_STYLES } from '../shiftDisplay.ts';
 
 interface Props {
@@ -16,6 +16,7 @@ const PICKABLE: ShiftState[] = ['OFF', 'ON_CALL', 'OPEN', 'CLOSE', 'TIMED'];
 
 export function ShiftEditor({ employee, dayIndex, shift, onClose }: Props) {
   const { saveShift, deleteShift, settings } = useSchedule();
+  const dayHours = settings ? hoursForDay(settings, dayIndex) : null;
   const [state, setState] = useState<ShiftState>(shift?.state ?? 'OFF');
   const [start, setStart] = useState(minutesTo24h(shift?.startMinutes ?? null));
   const [end, setEnd] = useState(minutesTo24h(shift?.endMinutes ?? null));
@@ -110,7 +111,7 @@ export function ShiftEditor({ employee, dayIndex, shift, onClose }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div className={needsStart ? '' : 'opacity-40'}>
               <label className="mb-1 block text-xs font-medium text-slate-500">
-                Start {state === 'OPEN' && '(store open)'}
+                Start {state === 'OPEN' && dayHours && `(opens ${minutesToLabel(dayHours.open)})`}
               </label>
               <input
                 type="time"
@@ -122,7 +123,7 @@ export function ShiftEditor({ employee, dayIndex, shift, onClose }: Props) {
             </div>
             <div className={needsEnd ? '' : 'opacity-40'}>
               <label className="mb-1 block text-xs font-medium text-slate-500">
-                End {state === 'CLOSE' && '(store close)'}
+                End {state === 'CLOSE' && dayHours && `(closes ${minutesToLabel(dayHours.close)})`}
               </label>
               <input
                 type="time"

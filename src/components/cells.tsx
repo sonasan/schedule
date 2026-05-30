@@ -53,11 +53,20 @@ export function StationCell({
   onClick: () => void;
 }) {
   const ids = assignment?.employeeIds ?? [];
-  const hasSuggestion = !ids.length && suggestedIds && suggestedIds.length > 0;
-  const uncovered = station.requiredDaily && ids.length === 0;
+  const active = station.days.includes(dayIndex);
+  const hasSuggestion = active && !ids.length && suggestedIds && suggestedIds.length > 0;
+  const uncovered = active && station.requiredDaily && ids.length === 0;
 
   function stateFor(empId: number): string {
     return shifts.find((s) => s.dayIndex === dayIndex && s.employeeId === empId)?.state ?? 'OFF';
+  }
+
+  if (!active) {
+    return (
+      <div className="flex h-full min-h-[2.5rem] w-full items-center justify-center border border-slate-100 bg-slate-50 text-slate-300">
+        <span className="text-[10px]">—</span>
+      </div>
+    );
   }
 
   return (

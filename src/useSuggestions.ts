@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useSchedule } from './store.tsx';
 import { suggestAssignments } from '../shared/suggest.ts';
-import type { SuggestionProposal } from '../shared/types.ts';
+import { hoursForDay, type SuggestionProposal } from '../shared/types.ts';
 
 // Suggested assignments for a single day, keyed by station id.
 export function useDaySuggestions(dayIndex: number, includeOnCall = false): Map<number, number[]> {
@@ -9,14 +9,15 @@ export function useDaySuggestions(dayIndex: number, includeOnCall = false): Map<
   return useMemo(() => {
     const map = new Map<number, number[]>();
     if (!weekData || !settings) return map;
+    const hrs = hoursForDay(settings, dayIndex);
     const proposals: SuggestionProposal[] = suggestAssignments({
       stations,
       employees,
       shifts: weekData.shifts,
       dayIndex,
       affinity: affinityMap,
-      openMinutes: settings.openMinutes,
-      closeMinutes: settings.closeMinutes,
+      openMinutes: hrs.open,
+      closeMinutes: hrs.close,
       includeOnCall,
     });
     for (const p of proposals) map.set(p.stationId, p.employeeIds);
@@ -31,14 +32,15 @@ export function useWeekSuggestions(includeOnCall = false): Map<number, Map<numbe
     const result = new Map<number, Map<number, number[]>>();
     if (!weekData || !settings) return result;
     for (let day = 0; day < 7; day++) {
+      const hrs = hoursForDay(settings, day);
       const proposals = suggestAssignments({
         stations,
         employees,
         shifts: weekData.shifts,
         dayIndex: day,
         affinity: affinityMap,
-        openMinutes: settings.openMinutes,
-        closeMinutes: settings.closeMinutes,
+        openMinutes: hrs.open,
+        closeMinutes: hrs.close,
         includeOnCall,
       });
       const inner = new Map<number, number[]>();

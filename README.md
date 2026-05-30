@@ -25,7 +25,10 @@ on-call staff can be assigned but are flagged as tentative.
 
 - **CSV importer** for the manager's existing messy spreadsheet, with a
   post-import **review screen** listing anything that couldn't be parsed
-  cleanly. The bundled `sample-schedule.csv` seeds the database on first run.
+  cleanly (`sample-schedule.csv` is included to try it).
+- **Per-day store hours** and **per-day station availability** — e.g. the
+  store opens 4:00 AM weekdays / 4:30 AM Saturday / 5:00 AM Sunday (closing
+  8:00 PM), and DELIVERY + SAND 3 run on weekends only.
 - **Week view** (desktop): two stacked grids (staff × days, stations × days)
   with sticky headers, color-coded shift states, and a quick editor.
 - **Day view** (mobile): one day at a time with large tap targets and a
@@ -54,8 +57,10 @@ This starts both the API (Express, port 3001) and the web app
 
 **http://localhost:5173**
 
-On first run the data file (`schedule.json`) is created and seeded from
-`sample-schedule.csv`, so the app boots with realistic data.
+On first run the data file (`schedule.json`) is created and seeded with the
+store's current roster, default stations, and store hours, plus an empty
+current week — ready to start scheduling. Run `npm run reset` (then restart)
+to wipe all data and re-seed from scratch.
 
 ### Other commands
 
@@ -65,6 +70,7 @@ On first run the data file (`schedule.json`) is created and seeded from
 | `npm run build`    | Type-check and build the production frontend  |
 | `npm run typecheck`| Type-check only                               |
 | `npm run start`    | Run the API server once (no watch)            |
+| `npm run reset`    | Delete all data (re-seeds on next start)      |
 
 ## How it's built
 
@@ -84,14 +90,15 @@ On first run the data file (`schedule.json`) is created and seeded from
 server/        Express API, JSON store, CSV importer
 shared/        Types + pure logic (parser, time, coverage, suggest)
 src/           React app (components, store, API client)
-sample-schedule.csv   Seed data imported on first run
+sample-schedule.csv   Example messy CSV for trying the importer
 ```
 
 ## Data & backup
 
 All data lives in `schedule.json` in the project root. To back up, copy that
-file. To start fresh, delete it — the app reseeds from the sample CSV on the
-next launch. (It's git-ignored so your data never gets committed.)
+file. To start fresh, run `npm run reset` (or delete the file) — the app
+re-seeds the roster, stations, and hours on the next launch. (It's git-ignored
+so your data never gets committed.)
 
 ## CSV format
 

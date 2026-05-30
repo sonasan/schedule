@@ -1,36 +1,35 @@
 import express from 'express';
 import cors from 'cors';
-import { readFileSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import { initStore, isStoreEmpty } from './db.ts';
 import * as repo from './repo.ts';
 import { importCsv } from './importer.ts';
 import { addDays } from '../shared/time.ts';
-import type { Assignment, Shift } from '../shared/types.ts';
+import { DEFAULT_ROSTER, type Assignment, type Shift } from '../shared/types.ts';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 
 initStore();
 
-// Seed the store from the bundled sample CSV the first time the app boots.
+// On first boot (empty store), seed the current roster and an empty current
+// week so the app opens to something usable. Stations + store hours come from
+// the defaults seeded in initStore().
 function seedIfEmpty(): void {
   if (!isStoreEmpty()) return;
-  const samplePath = join(__dirname, '..', 'sample-schedule.csv');
-  if (!existsSync(samplePath)) return;
-  try {
-    const csv = readFileSync(samplePath, 'utf8');
-    const report = importCsv(csv, repo.getSettings());
-    console.log(
-      `Seeded from sample-schedule.csv: ${report.shiftsImported} shifts, ` +
-        `${report.assignmentsImported} assignments, ${report.employeesCreated.length} employees.`,
-    );
-  } catch (err) {
-    console.error('Failed to seed from sample CSV:', err);
-  }
+  for (const name of DEFAULT_ROSTER) repo.createEmployee({ name });
+
+  // Create the current week (most recent week-start day on/before today).
+  const settings = repo.getSettings();
+  const today = new Date();
+  const diff = (today.getDay() - settings.weekStartDay + 7) % 7;
+  today.setDate(today.getDate() - diff);
+  const startDate = today.toISOString().slice(0, 10);
+  repo.getOrCreateWeek(startDate);
+
+  console.log(
+    `Seeded roster: ${DEFAULT_ROSTER.length} employees, week of ${startDate}.`,
+  );
 }
 seedIfEmpty();
 
