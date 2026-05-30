@@ -1,0 +1,11 @@
+node_modules
+dist
+*.local
+.DS_Store
+*.tsbuildinfo
+
+# Local SQLite database (data is regenerated from sample-schedule.csv on first run)
+schedule.db
+schedule.db-journal
+schedule.db-wal
+schedule.db-shm

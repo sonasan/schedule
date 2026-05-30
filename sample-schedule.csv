@@ -1,0 +1,27 @@
+,5/24/2026,5/25/2026,5/26/2026,5/27/2026,5/28/2026,5/29/2026,5/30/2026
+NAME,SUN,MON,TUE,WED,THU,FRI,SAT
+Sonal,OPEN,4 to 12,OFF,OPEN to 10,on call,5 to close,4.30 to 12
+Agna,6:45 to 12,OPEN,OfF,1 to close,OPEN TO 7:30,OFF,8 to 4.30
+Paras,4 to 12(Truck),close,12 TO CLOSE,OFF,OPEN,4 to 12,call?
+Maria,OFF,OFF,OPEN to 7,6 to 2,1 to close,OPEN,OFF
+John,1 to close,on call,4 to 12,OFF,close,5/6,OPEN
+Priya,OPEN,4.30 to 12,OFF,OPEN,4 to 12,OFF,1 to close
+
+Alex,OFF,5 to close,OPEN,OFF,4 to 12,1 to close,OPEN
+Sam,4 to 12,OFF,1 to close,8 OR 4.30,OFF,OPEN,4 to 12
+Nina,Thank you,OFF,OFF,OPEN,on call,4 to 12,OFF
+Raj,to close(Cake),4 to 12,OPEN,12.30/1,OFF,OFF,close
+
+FRONT,Sonal,Agna,Maria/Priya,Priya,Sam,Sonal,John
+DT ORDER,Agna,Priya,Paras,Maria,John,Sonal,Priya
+DT CASH,Priya,Alex,Sam,Maria,Sam,Sam,Raj
+TAP/OUTSIDE,Paras,Sam,Alex,Maria,Alex,Paras,Sam
+LABEL,Sonal,Priya,Maria,Priya,John,Sonal,John
+HOT,John,Agna,Paras,Maria,Alex,Paras,Priya
+LATTE/FROZEN,Priya,Alex,Sam,Priya,Sam,Sonal,Sam
+DOORDASH/UBER,Sam,Alex,Sam,Maria,Alex,Sonal,Raj
+EXPEDITER,Sonal,Agna,Maria,Priya,John,Paras,John
+SAND,Paras,Agna,Paras,Maria,John,Paras,Priya
+SAND 2,John,Priya,Alex,Maria,Alex,Sonal,Sam
+SAND 3,Priya,Alex,Sam,Priya,Sam,Sonal,Raj
+CAKE,Raj(Cake),Agna,PARAS(Truck),Priya,John,Sonal,Raj
