@@ -1,313 +1,230 @@
-import { db } from './db.ts';
+// Data-access layer over the in-memory JSON store. Every mutator schedules a
+// debounced flush to disk. Function signatures match what index.ts/importer.ts
+// expect, so the rest of the server is storage-agnostic.
+
+import { store, save, nextId } from './db.ts';
 import type {
   Affinity,
   Assignment,
-  Crew,
   Employee,
   Settings,
   Shift,
-  ShiftState,
   Station,
   Week,
 } from '../shared/types.ts';
 
-// ---- Row mappers ----
-
-function mapEmployee(r: any): Employee {
-  return {
-    id: r.id,
-    name: r.name,
-    active: !!r.active,
-    crew: r.crew as Crew,
-    usualStations: JSON.parse(r.usual_stations || '[]'),
-    notes: r.notes || '',
-  };
-}
-
-function mapStation(r: any): Station {
-  return {
-    id: r.id,
-    name: r.name,
-    order: r.order,
-    allowsSplit: !!r.allows_split,
-    requiredDaily: !!r.required_daily,
-  };
-}
-
-function mapShift(r: any): Shift {
-  return {
-    id: r.id,
-    weekId: r.week_id,
-    employeeId: r.employee_id,
-    dayIndex: r.day_index,
-    state: r.state as ShiftState,
-    startMinutes: r.start_minutes,
-    endMinutes: r.end_minutes,
-    endUncertain: !!r.end_uncertain,
-    note: r.note || '',
-    rawText: r.raw_text || '',
-    needsReview: !!r.needs_review,
-    reviewReason: r.review_reason || '',
-  };
-}
-
-function mapAssignment(r: any): Assignment {
-  return {
-    id: r.id,
-    weekId: r.week_id,
-    dayIndex: r.day_index,
-    stationId: r.station_id,
-    employeeIds: JSON.parse(r.employee_ids || '[]'),
-    note: r.note || '',
-  };
+function clone<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v));
 }
 
 // ---- Settings ----
 
 export function getSettings(): Settings {
-  const r = db.prepare('SELECT * FROM settings WHERE id = 1').get() as any;
-  return {
-    openMinutes: r.open_minutes,
-    closeMinutes: r.close_minutes,
-    weekStartDay: r.week_start_day,
-  };
+  return { ...store.settings };
 }
 
 export function updateSettings(s: Partial<Settings>): Settings {
-  const current = getSettings();
-  const next = { ...current, ...s };
-  db.prepare(
-    `UPDATE settings SET open_minutes = @openMinutes, close_minutes = @closeMinutes,
-     week_start_day = @weekStartDay WHERE id = 1`,
-  ).run(next);
-  return next;
+  store.settings = { ...store.settings, ...s };
+  save();
+  return { ...store.settings };
 }
 
 // ---- Employees ----
 
 export function listEmployees(includeInactive = true): Employee[] {
-  const rows = db
-    .prepare(
-      `SELECT * FROM employees ${includeInactive ? '' : 'WHERE active = 1'} ORDER BY name COLLATE NOCASE`,
-    )
-    .all();
-  return rows.map(mapEmployee);
+  return store.employees
+    .filter((e) => includeInactive || e.active)
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+    .map(clone);
 }
 
 export function getEmployee(id: number): Employee | undefined {
-  const r = db.prepare('SELECT * FROM employees WHERE id = ?').get(id);
-  return r ? mapEmployee(r) : undefined;
+  const e = store.employees.find((x) => x.id === id);
+  return e ? clone(e) : undefined;
 }
 
 export function findEmployeeByName(name: string): Employee | undefined {
-  const r = db
-    .prepare('SELECT * FROM employees WHERE name = ? COLLATE NOCASE')
-    .get(name.trim());
-  return r ? mapEmployee(r) : undefined;
+  const target = name.trim().toLowerCase();
+  const e = store.employees.find((x) => x.name.trim().toLowerCase() === target);
+  return e ? clone(e) : undefined;
 }
 
 export function createEmployee(data: Partial<Employee> & { name: string }): Employee {
-  const info = db
-    .prepare(
-      `INSERT INTO employees (name, active, crew, usual_stations, notes)
-       VALUES (@name, @active, @crew, @usualStations, @notes)`,
-    )
-    .run({
-      name: data.name.trim(),
-      active: data.active === false ? 0 : 1,
-      crew: data.crew || 'ANY',
-      usualStations: JSON.stringify(data.usualStations || []),
-      notes: data.notes || '',
-    });
-  return getEmployee(Number(info.lastInsertRowid))!;
+  const emp: Employee = {
+    id: nextId('employee'),
+    name: data.name.trim(),
+    active: data.active === false ? false : true,
+    crew: data.crew || 'ANY',
+    usualStations: data.usualStations || [],
+    notes: data.notes || '',
+  };
+  store.employees.push(emp);
+  save();
+  return clone(emp);
 }
 
 export function updateEmployee(id: number, data: Partial<Employee>): Employee | undefined {
-  const cur = getEmployee(id);
-  if (!cur) return undefined;
-  const next = { ...cur, ...data };
-  db.prepare(
-    `UPDATE employees SET name = @name, active = @active, crew = @crew,
-     usual_stations = @usualStations, notes = @notes WHERE id = @id`,
-  ).run({
-    id,
-    name: next.name,
-    active: next.active ? 1 : 0,
-    crew: next.crew,
-    usualStations: JSON.stringify(next.usualStations),
-    notes: next.notes,
+  const e = store.employees.find((x) => x.id === id);
+  if (!e) return undefined;
+  Object.assign(e, {
+    name: data.name ?? e.name,
+    active: data.active ?? e.active,
+    crew: data.crew ?? e.crew,
+    usualStations: data.usualStations ?? e.usualStations,
+    notes: data.notes ?? e.notes,
   });
-  return getEmployee(id);
+  save();
+  return clone(e);
 }
 
 // ---- Stations ----
 
 export function listStations(): Station[] {
-  return db.prepare('SELECT * FROM stations ORDER BY "order", id').all().map(mapStation);
+  return store.stations
+    .slice()
+    .sort((a, b) => a.order - b.order || a.id - b.id)
+    .map(clone);
 }
 
 export function getStation(id: number): Station | undefined {
-  const r = db.prepare('SELECT * FROM stations WHERE id = ?').get(id);
-  return r ? mapStation(r) : undefined;
+  const s = store.stations.find((x) => x.id === id);
+  return s ? clone(s) : undefined;
 }
 
 export function createStation(data: Partial<Station> & { name: string }): Station {
-  const maxOrder = db.prepare('SELECT COALESCE(MAX("order"), -1) AS m FROM stations').get() as {
-    m: number;
+  const maxOrder = store.stations.reduce((m, s) => Math.max(m, s.order), -1);
+  const station: Station = {
+    id: nextId('station'),
+    name: data.name.trim(),
+    order: data.order ?? maxOrder + 1,
+    allowsSplit: data.allowsSplit === false ? false : true,
+    requiredDaily: data.requiredDaily ?? false,
   };
-  const info = db
-    .prepare(
-      `INSERT INTO stations (name, "order", allows_split, required_daily)
-       VALUES (@name, @order, @allowsSplit, @requiredDaily)`,
-    )
-    .run({
-      name: data.name.trim(),
-      order: data.order ?? maxOrder.m + 1,
-      allowsSplit: data.allowsSplit === false ? 0 : 1,
-      requiredDaily: data.requiredDaily ? 1 : 0,
-    });
-  return getStation(Number(info.lastInsertRowid))!;
+  store.stations.push(station);
+  save();
+  return clone(station);
 }
 
 export function updateStation(id: number, data: Partial<Station>): Station | undefined {
-  const cur = getStation(id);
-  if (!cur) return undefined;
-  const next = { ...cur, ...data };
-  db.prepare(
-    `UPDATE stations SET name = @name, "order" = @order, allows_split = @allowsSplit,
-     required_daily = @requiredDaily WHERE id = @id`,
-  ).run({
-    id,
-    name: next.name,
-    order: next.order,
-    allowsSplit: next.allowsSplit ? 1 : 0,
-    requiredDaily: next.requiredDaily ? 1 : 0,
+  const s = store.stations.find((x) => x.id === id);
+  if (!s) return undefined;
+  Object.assign(s, {
+    name: data.name ?? s.name,
+    order: data.order ?? s.order,
+    allowsSplit: data.allowsSplit ?? s.allowsSplit,
+    requiredDaily: data.requiredDaily ?? s.requiredDaily,
   });
-  return getStation(id);
+  save();
+  return clone(s);
 }
 
 export function deleteStation(id: number): void {
-  db.prepare('DELETE FROM stations WHERE id = ?').run(id);
+  store.stations = store.stations.filter((s) => s.id !== id);
+  // Cascade: drop assignments and affinity that referenced the station.
+  store.assignments = store.assignments.filter((a) => a.stationId !== id);
+  store.affinity = store.affinity.filter((a) => a.stationId !== id);
+  save();
 }
 
 // ---- Weeks ----
 
 export function listWeeks(): Week[] {
-  return db
-    .prepare('SELECT * FROM weeks ORDER BY start_date DESC')
-    .all()
-    .map((r: any) => ({ id: r.id, startDate: r.start_date }));
+  return store.weeks
+    .slice()
+    .sort((a, b) => (a.startDate < b.startDate ? 1 : a.startDate > b.startDate ? -1 : 0))
+    .map(clone);
 }
 
 export function getWeek(id: number): Week | undefined {
-  const r = db.prepare('SELECT * FROM weeks WHERE id = ?').get(id) as any;
-  return r ? { id: r.id, startDate: r.start_date } : undefined;
+  const w = store.weeks.find((x) => x.id === id);
+  return w ? clone(w) : undefined;
 }
 
 export function getOrCreateWeek(startDate: string): Week {
-  const existing = db.prepare('SELECT * FROM weeks WHERE start_date = ?').get(startDate) as any;
-  if (existing) return { id: existing.id, startDate: existing.start_date };
-  const info = db.prepare('INSERT INTO weeks (start_date) VALUES (?)').run(startDate);
-  return { id: Number(info.lastInsertRowid), startDate };
+  const existing = store.weeks.find((w) => w.startDate === startDate);
+  if (existing) return clone(existing);
+  const week: Week = { id: nextId('week'), startDate };
+  store.weeks.push(week);
+  save();
+  return clone(week);
 }
 
 // ---- Shifts ----
 
 export function listShifts(weekId: number): Shift[] {
-  return db.prepare('SELECT * FROM shifts WHERE week_id = ?').all(weekId).map(mapShift);
+  return store.shifts.filter((s) => s.weekId === weekId).map(clone);
 }
 
 export function upsertShift(s: Omit<Shift, 'id'>): Shift {
-  db.prepare(
-    `INSERT INTO shifts (week_id, employee_id, day_index, state, start_minutes, end_minutes,
-       end_uncertain, note, raw_text, needs_review, review_reason)
-     VALUES (@weekId, @employeeId, @dayIndex, @state, @startMinutes, @endMinutes,
-       @endUncertain, @note, @rawText, @needsReview, @reviewReason)
-     ON CONFLICT(week_id, employee_id, day_index) DO UPDATE SET
-       state = excluded.state, start_minutes = excluded.start_minutes,
-       end_minutes = excluded.end_minutes, end_uncertain = excluded.end_uncertain,
-       note = excluded.note, raw_text = excluded.raw_text,
-       needs_review = excluded.needs_review, review_reason = excluded.review_reason`,
-  ).run({
-    weekId: s.weekId,
-    employeeId: s.employeeId,
-    dayIndex: s.dayIndex,
-    state: s.state,
-    startMinutes: s.startMinutes,
-    endMinutes: s.endMinutes,
-    endUncertain: s.endUncertain ? 1 : 0,
-    note: s.note,
-    rawText: s.rawText,
-    needsReview: s.needsReview ? 1 : 0,
-    reviewReason: s.reviewReason,
-  });
-  const r = db
-    .prepare('SELECT * FROM shifts WHERE week_id = ? AND employee_id = ? AND day_index = ?')
-    .get(s.weekId, s.employeeId, s.dayIndex);
-  return mapShift(r);
+  const existing = store.shifts.find(
+    (x) => x.weekId === s.weekId && x.employeeId === s.employeeId && x.dayIndex === s.dayIndex,
+  );
+  if (existing) {
+    Object.assign(existing, s);
+    save();
+    return clone(existing);
+  }
+  const shift: Shift = { id: nextId('shift'), ...s };
+  store.shifts.push(shift);
+  save();
+  return clone(shift);
 }
 
 export function deleteShift(weekId: number, employeeId: number, dayIndex: number): void {
-  db.prepare('DELETE FROM shifts WHERE week_id = ? AND employee_id = ? AND day_index = ?').run(
-    weekId,
-    employeeId,
-    dayIndex,
+  store.shifts = store.shifts.filter(
+    (s) => !(s.weekId === weekId && s.employeeId === employeeId && s.dayIndex === dayIndex),
   );
+  save();
 }
 
 // ---- Assignments ----
 
 export function listAssignments(weekId: number): Assignment[] {
-  return db
-    .prepare('SELECT * FROM assignments WHERE week_id = ?')
-    .all(weekId)
-    .map(mapAssignment);
+  return store.assignments.filter((a) => a.weekId === weekId).map(clone);
 }
 
 export function upsertAssignment(a: Omit<Assignment, 'id'>): Assignment {
-  // Empty employee list -> remove the assignment row entirely.
+  // Empty employee list -> remove the assignment entirely.
   if (!a.employeeIds || a.employeeIds.length === 0) {
-    db.prepare(
-      'DELETE FROM assignments WHERE week_id = ? AND day_index = ? AND station_id = ?',
-    ).run(a.weekId, a.dayIndex, a.stationId);
-    return { id: -1, ...a };
+    store.assignments = store.assignments.filter(
+      (x) => !(x.weekId === a.weekId && x.dayIndex === a.dayIndex && x.stationId === a.stationId),
+    );
+    save();
+    return { id: -1, ...a, note: a.note || '' };
   }
-  db.prepare(
-    `INSERT INTO assignments (week_id, day_index, station_id, employee_ids, note)
-     VALUES (@weekId, @dayIndex, @stationId, @employeeIds, @note)
-     ON CONFLICT(week_id, day_index, station_id) DO UPDATE SET
-       employee_ids = excluded.employee_ids, note = excluded.note`,
-  ).run({
-    weekId: a.weekId,
-    dayIndex: a.dayIndex,
-    stationId: a.stationId,
-    employeeIds: JSON.stringify(a.employeeIds),
-    note: a.note || '',
-  });
-  const r = db
-    .prepare('SELECT * FROM assignments WHERE week_id = ? AND day_index = ? AND station_id = ?')
-    .get(a.weekId, a.dayIndex, a.stationId);
-  return mapAssignment(r);
+  const existing = store.assignments.find(
+    (x) => x.weekId === a.weekId && x.dayIndex === a.dayIndex && x.stationId === a.stationId,
+  );
+  if (existing) {
+    existing.employeeIds = a.employeeIds;
+    existing.note = a.note || '';
+    save();
+    return clone(existing);
+  }
+  const assignment: Assignment = { id: nextId('assignment'), ...a, note: a.note || '' };
+  store.assignments.push(assignment);
+  save();
+  return clone(assignment);
 }
 
 // ---- Affinity ----
 
 export function listAffinity(): Affinity[] {
-  return db
-    .prepare('SELECT * FROM affinity')
-    .all()
-    .map((r: any) => ({ employeeId: r.employee_id, stationId: r.station_id, weight: r.weight }));
+  return store.affinity.map(clone);
 }
 
 export function bumpAffinity(employeeId: number, stationId: number, delta = 1): void {
-  db.prepare(
-    `INSERT INTO affinity (employee_id, station_id, weight) VALUES (?, ?, ?)
-     ON CONFLICT(employee_id, station_id) DO UPDATE SET weight = weight + ?`,
-  ).run(employeeId, stationId, delta, delta);
+  const existing = store.affinity.find(
+    (a) => a.employeeId === employeeId && a.stationId === stationId,
+  );
+  if (existing) existing.weight += delta;
+  else store.affinity.push({ employeeId, stationId, weight: delta });
+  save();
 }
 
 export function getAffinityMap(): Map<string, number> {
   const map = new Map<string, number>();
-  for (const a of listAffinity()) map.set(`${a.employeeId}:${a.stationId}`, a.weight);
+  for (const a of store.affinity) map.set(`${a.employeeId}:${a.stationId}`, a.weight);
   return map;
 }

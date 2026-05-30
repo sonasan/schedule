@@ -49,12 +49,12 @@ npm install
 npm run dev
 ```
 
-This starts both the API (Express + SQLite, port 3001) and the web app
+This starts both the API (Express, port 3001) and the web app
 (Vite, port 5173) together via `concurrently`. Open:
 
 **http://localhost:5173**
 
-On first run the database (`schedule.db`) is created and seeded from
+On first run the data file (`schedule.json`) is created and seeded from
 `sample-schedule.csv`, so the app boots with realistic data.
 
 ### Other commands
@@ -69,8 +69,11 @@ On first run the database (`schedule.db`) is created and seeded from
 ## How it's built
 
 - **Frontend:** React + TypeScript + Vite + Tailwind CSS.
-- **Backend:** Node + Express + `better-sqlite3`, writing to a local
-  `schedule.db` file (so data survives restarts).
+- **Backend:** Node + Express, persisting to a local `schedule.json` file (so
+  data survives restarts). A plain JSON file is used instead of a native SQLite
+  binding so `npm install` needs **no compiler or build tools** and works the
+  same on macOS, Linux, and Windows. It's still trivial to back up (copy the
+  file) and inspect.
 - **Shared logic** (`shared/`): the parser, time helpers, coverage checks, and
   the auto-suggest algorithm are pure functions reused by both the server
   (import/seed) and the client (live recompute).
@@ -78,7 +81,7 @@ On first run the database (`schedule.db`) is created and seeded from
 ### Project layout
 
 ```
-server/        Express API, SQLite schema, CSV importer
+server/        Express API, JSON store, CSV importer
 shared/        Types + pure logic (parser, time, coverage, suggest)
 src/           React app (components, store, API client)
 sample-schedule.csv   Seed data imported on first run
@@ -86,7 +89,7 @@ sample-schedule.csv   Seed data imported on first run
 
 ## Data & backup
 
-All data lives in `schedule.db` in the project root. To back up, copy that
+All data lives in `schedule.json` in the project root. To back up, copy that
 file. To start fresh, delete it — the app reseeds from the sample CSV on the
 next launch. (It's git-ignored so your data never gets committed.)
 

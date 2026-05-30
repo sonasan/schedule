@@ -4,7 +4,9 @@ dist
 .DS_Store
 *.tsbuildinfo
 
-# Local SQLite database (data is regenerated from sample-schedule.csv on first run)
+# Local data store (regenerated from sample-schedule.csv on first run)
+schedule.json
+schedule.json.tmp
 schedule.db
 schedule.db-journal
 schedule.db-wal

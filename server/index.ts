@@ -3,7 +3,7 @@ import cors from 'cors';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { db, initSchema, isDatabaseEmpty } from './db.ts';
+import { initStore, isStoreEmpty } from './db.ts';
 import * as repo from './repo.ts';
 import { importCsv } from './importer.ts';
 import { addDays } from '../shared/time.ts';
@@ -14,11 +14,11 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 
-initSchema();
+initStore();
 
-// Seed the DB from the bundled sample CSV the first time the app boots.
+// Seed the store from the bundled sample CSV the first time the app boots.
 function seedIfEmpty(): void {
-  if (!isDatabaseEmpty()) return;
+  if (!isStoreEmpty()) return;
   const samplePath = join(__dirname, '..', 'sample-schedule.csv');
   if (!existsSync(samplePath)) return;
   try {
@@ -207,19 +207,16 @@ app.post(
     const copyShifts = req.body?.shifts !== false;
     const copyAssignments = req.body?.assignments === true;
 
-    const tx = db.transaction(() => {
-      if (copyShifts) {
-        for (const s of repo.listShifts(sourceId)) {
-          repo.upsertShift({ ...s, weekId: targetId });
-        }
+    if (copyShifts) {
+      for (const s of repo.listShifts(sourceId)) {
+        repo.upsertShift({ ...s, weekId: targetId });
       }
-      if (copyAssignments) {
-        for (const a of repo.listAssignments(sourceId)) {
-          repo.upsertAssignment({ ...a, weekId: targetId });
-        }
+    }
+    if (copyAssignments) {
+      for (const a of repo.listAssignments(sourceId)) {
+        repo.upsertAssignment({ ...a, weekId: targetId });
       }
-    });
-    tx();
+    }
 
     res.json({
       week: target,
